@@ -2,7 +2,6 @@
 using System.Text.RegularExpressions;
 using LibGit2Sharp;
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
 using YoutubeTranscriptApi;
 using Path = System.IO.Path;
 
@@ -10,6 +9,18 @@ namespace nyingest;
 
 class Program
 {
+    public static void Sanitize(ref StringBuilder str)
+    {
+        str.Replace("     ", " ");
+        str.Replace("    ", " ");
+        str.Replace("   ", " ");
+        str.Replace("  ", " ");
+        str.Replace("\n", "");
+        str.Replace("\t", "");
+        str.Replace("\r", "");
+    }
+
+    // TODO: this sucks.
     public static bool IsMatch(string input, string pattern)
     {
         string regexPattern = "^" + Regex.Escape(pattern)
@@ -17,11 +28,14 @@ class Program
                 .Replace("\\?", ".") // Replace ? with .
                 .Replace("\\/", "/") // Allow / to match /
             ;
-        // + ".*$"; // Allow for additional characters after the pattern
-
         return Regex.IsMatch(input, regexPattern, RegexOptions.IgnoreCase); // Add IgnoreCase option
     }
 
+    /// <summary>
+    /// Get the transcript of a youtube video
+    /// </summary>
+    /// <param name="videoId">The id of the youtube video</param>
+    /// <returns></returns>
     public static async Task<string> GetTranscriptAsync(string videoId)
     {
         try {
@@ -36,6 +50,7 @@ class Program
                 sb.Append(" ");
             }
 
+            Sanitize(ref sb);
             return sb.ToString();
         }
         catch (Exception ex) {
@@ -45,6 +60,15 @@ class Program
         }
     }
 
+    /// <summary>
+    /// Git clones the url, then based on the matchWildcards and negativeWildcards, cats the sanitized file contents
+    /// for each file where the size is less that max_filesize_B. Puts a header and footer on each file
+    /// </summary>
+    /// <param name="giturl"></param>
+    /// <param name="matchWildcards"></param>
+    /// <param name="negativeWildcards"></param>
+    /// <param name="max_filesize_B"></param>
+    /// <returns></returns>
     public static async Task<string> GetGitRepoAsync(string giturl, string matchWildcards, string negativeWildcards,
         long max_filesize_B = 0)
     {
@@ -102,12 +126,15 @@ class Program
                 }
             }
 
-            contents.AppendFormat("---- end of {0} ----\n\n", Path.GetFileName(file));
+            // contents.AppendFormat("---- end of {0} ----\n\n", Path.GetFileName(file));
+            contents.AppendFormat("---- file end ----\n\n");
         }
 
+        Sanitize(ref contents);
         return contents.ToString();
     }
 
+    //TODO: Add page png mode that copies pages of pdf? Maybe go into readline mode and press enter to copy each into clip
     public static async Task<string> GetPdfAsync(string url)
     {
         StringBuilder sb = new();
@@ -231,16 +258,7 @@ class Program
                     str = new StringBuilder(File.ReadAllText(url));
                 }
 
-                // Double spaces to single
-                // This is stupid
-                str.Replace("     ", " ");
-                str.Replace("    ", " ");
-                str.Replace("   ", " ");
-                str.Replace("  ", " ");
-                str.Replace("\n", "");
-                str.Replace("\t", "");
-                str.Replace("\r", "");
-
+                Sanitize(ref str);
                 Console.WriteLine(str);
                 str.Clear();
 
