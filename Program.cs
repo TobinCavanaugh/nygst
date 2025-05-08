@@ -111,10 +111,21 @@ class Program
     public static async Task<string> GetPdfAsync(string url)
     {
         StringBuilder sb = new();
-        using (HttpClient client = new HttpClient()) {
-            byte[] bytes = client.GetByteArrayAsync(url).GetAwaiter().GetResult();
 
-            using (PdfDocument document = PdfDocument.Open(bytes)) {
+        if (url.Contains("http")) {
+            using (HttpClient client = new HttpClient()) {
+                byte[] bytes = client.GetByteArrayAsync(url).GetAwaiter().GetResult();
+
+                using (PdfDocument document = PdfDocument.Open(bytes)) {
+                    for (int i = 1; i <= document.NumberOfPages; i++) {
+                        string text = document.GetPage(i).Text;
+                        sb.AppendLine(text);
+                    }
+                }
+            }
+        }
+        else if (File.Exists(url)) {
+            using (PdfDocument document = PdfDocument.Open(File.ReadAllBytes(url))) {
                 for (int i = 1; i <= document.NumberOfPages; i++) {
                     string text = document.GetPage(i).Text;
                     sb.AppendLine(text);
@@ -210,22 +221,28 @@ class Program
                 break;
             }
             case WebsiteSource.Other: {
-                using (HttpClient client = new HttpClient()) {
-                    StringBuilder webPage = new StringBuilder(client.GetStringAsync(url).Result);
-
-                    // Double spaces to single
-                    // This is stupid
-                    webPage.Replace("     ", " ");
-                    webPage.Replace("    ", " ");
-                    webPage.Replace("   ", " ");
-                    webPage.Replace("  ", " ");
-                    webPage.Replace("\n", "");
-                    webPage.Replace("\t", "");
-                    webPage.Replace("\r", "");
-
-                    Console.WriteLine(webPage);
-                    webPage.Clear();
+                StringBuilder str = new();
+                if (url.StartsWith("http") || url.StartsWith("www.")) {
+                    using (HttpClient client = new HttpClient()) {
+                        str = new StringBuilder(client.GetStringAsync(url).Result);
+                    }
                 }
+                else if (File.Exists(url)) {
+                    str = new StringBuilder(File.ReadAllText(url));
+                }
+
+                // Double spaces to single
+                // This is stupid
+                str.Replace("     ", " ");
+                str.Replace("    ", " ");
+                str.Replace("   ", " ");
+                str.Replace("  ", " ");
+                str.Replace("\n", "");
+                str.Replace("\t", "");
+                str.Replace("\r", "");
+
+                Console.WriteLine(str);
+                str.Clear();
 
                 break;
             }
